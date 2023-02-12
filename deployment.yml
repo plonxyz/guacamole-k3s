@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: guacamole-ns
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guacd
+  namespace: guacamole-ns
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: guacd
+  template:
+    metadata:
+      labels:
+        app: guacd
+    spec:
+      containers:
+        - name: guacd
+          image: guacamole/guacd
+          ports:
+            - name: guacd
+              containerPort: 4822
+          env:
+            - name: GUACD_LOG_LEVEL
+              value: "info"
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: guacamole
+  namespace: guacamole-ns
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: guacamole
+  template:
+    metadata:
+      labels:
+        app: guacamole
+    spec:
+      containers:
+        - name: guacamole
+          image: guacamole/guacamole
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: GUACAMOLE_HOME
+              value: /config
+            - name: GUACD_HOSTNAME
+              value: svc-guad
+            - name: GUACD_PORT
+              value: "4822"
+            - name: MYSQL_HOSTNAME
+              value: mysql-svc
+            - name: MYSQL_DATABASE
+              value: guacamole
+            - name: MYSQL_USER
+              value: guacamole
+            - name: MYSQL_PASSWORD
+              value: guacamole
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+      volumes:
+        - name: config-volume
+          configMap:
+            name: guacamole-config
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: guacamole-config
+  namespace: guacamole-ns
+data:
+  guacamole.properties: |
+    # Hostname and port of guacd
+    guacd-hostname: guacd-service
+    guacd-port: 4822
+
+    # MySQL properties
+    mysql-hostname: #INSERT IP HERE
+    mysql-port: 3306
+    mysql-database: guacamole
+    mysql-username: guacamole
+    mysql-password: guacamole
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: guacamole-ingress
+  namespace: guacamole-ns
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - host: guacamole.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: guacamole-service
+                port:
+                  name: http
