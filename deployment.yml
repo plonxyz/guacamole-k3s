@@ -54,11 +54,11 @@ spec:
             - name: GUACAMOLE_HOME
               value: /config
             - name: GUACD_HOSTNAME
-              value: svc-guad
+              value: guacd-service.guacamole-ns.svc.cluster.local
             - name: GUACD_PORT
               value: "4822"
             - name: MYSQL_HOSTNAME
-              value: mysql-svc
+              value: ext-mariadb.guacamole-ns.svc.cluster.local
             - name: MYSQL_DATABASE
               value: guacamole
             - name: MYSQL_USER
@@ -82,16 +82,65 @@ metadata:
 data:
   guacamole.properties: |
     # Hostname and port of guacd
-    guacd-hostname: guacd-service
+    guacd-hostname: guacd-service.guacamole-ns.svc.cluster.local
     guacd-port: 4822
 
     # MySQL properties
-    mysql-hostname: #INSERT IP HERE
+    mysql-hostname: ext-mariadb.guacamole-ns.svc.cluster.local
     mysql-port: 3306
     mysql-database: guacamole
     mysql-username: guacamole
     mysql-password: guacamole
-
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guacamole-service
+  namespace: guacamole-ns
+spec:
+  selector:
+    app: guacamole
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: guacd-service
+  namespace: guacamole-ns
+spec:
+  selector:
+    app: guacd
+  ports:
+    - name: guacd
+      port: 4822
+      targetPort: guacd
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ext-mariadb
+  namespace: guacamole-ns
+spec:
+ ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: ext-mariadb
+  namespace: guacamole-ns
+subsets:
+  - addresses:
+     - ip: # IP external MYSQL SERVER
+    ports:
+     - port: 3306
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
